@@ -6,7 +6,7 @@ from web3 import Web3
 from eth_account.messages import encode_defunct
 from datetime import datetime
 from fake_useragent import UserAgent
-from colorama import init, Fore, Style, Back
+from colorama import init, Fore, Style
 
 init(autoreset=True)
 
@@ -69,17 +69,18 @@ def perform_tasks(token, proxies_dict):
     print(f"{Fore.CYAN}Starting tasks for account...")
     target_tasks = [4, 5, 6, 13, 15]
     successful_tasks = []
-    
+
     try:
         request_headers = get_headers()
         request_headers['Authorization'] = f'Bearer {token}'
+
         assignment_response = requests.post(
             'https://lightmining-api.taker.xyz/assignment/list',
             headers=request_headers,
             proxies=proxies_dict,
             timeout=None
         )
-        
+
         if assignment_response.status_code != 200:
             print(f"{Fore.RED}Failed to get tasks. Status code: {assignment_response.status_code}")
             return False
@@ -89,13 +90,13 @@ def perform_tasks(token, proxies_dict):
             print(f"{Fore.RED}Invalid response format: {response_data}")
             return False
 
-        assignments = response_data['data']
-        if not assignments:
-            print(f"{Fore.YELLOW}No assignments found")
+        assignments = response_data.get('data', [])
+        if not isinstance(assignments, list):
+            print(f"{Fore.RED}Assignments data is not a list: {assignments}")
             return False
-        
+
         for assignment in assignments:
-            if assignment['assignmentId'] in target_tasks:
+            if assignment.get('assignmentId') in target_tasks:
                 try:
                     do_response = requests.post(
                         'https://lightmining-api.taker.xyz/assignment/do',
@@ -104,19 +105,19 @@ def perform_tasks(token, proxies_dict):
                         proxies=proxies_dict,
                         timeout=None
                     )
-                    
+
                     response_data = do_response.json()
                     if response_data.get('code') == 200:
                         successful_tasks.append(assignment['title'])
-                        print(f"{Fore.GREEN}✓ {assignment['title']}")
+                        print(f"{Fore.GREEN}\u2713 {assignment['title']}")
                     else:
                         print(f"{Fore.RED}Task failed: {assignment['title']} - {response_data.get('message', 'Unknown error')}")
-                
+
                 except Exception as e:
-                    print(f"{Fore.RED}Error executing task {assignment['assignmentId']}: {str(e)}")
-                
+                    print(f"{Fore.RED}Error executing task {assignment.get('assignmentId')}: {str(e)}")
+
                 time.sleep(random.uniform(1, 2))
-        
+
         try:
             mining_response = requests.post(
                 'https://lightmining-api.taker.xyz/assignment/startMining',
@@ -124,16 +125,16 @@ def perform_tasks(token, proxies_dict):
                 proxies=proxies_dict,
                 timeout=None
             )
-            
+
             response_data = mining_response.json()
             if response_data.get('code') == 200:
-                print(f"{Fore.GREEN}✓ Mining started successfully")
+                print(f"{Fore.GREEN}\u2713 Mining started successfully")
             else:
                 print(f"{Fore.RED}Mining start failed: {response_data.get('message', 'Unknown error')}")
-                
+
         except Exception as e:
             print(f"{Fore.RED}Error starting mining: {str(e)}")
-            
+
         return len(successful_tasks) > 0
 
     except Exception as e:
@@ -143,7 +144,7 @@ def perform_tasks(token, proxies_dict):
 def create_account(referral_code, account_number, total_accounts, proxies):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     private_key, address = generate_wallet()
-    
+
     request_headers = get_headers()
     proxy = get_random_proxy(proxies)
     proxies_dict = {'http': proxy, 'https': proxy} if proxy else None
@@ -156,7 +157,7 @@ def create_account(referral_code, account_number, total_accounts, proxies):
             proxies=proxies_dict,
             timeout=None
         )
-        
+
         if nonce_response.status_code != 200:
             print(f"{Fore.RED}Failed to get nonce. Status code: {nonce_response.status_code}")
             return False
@@ -181,7 +182,7 @@ def create_account(referral_code, account_number, total_accounts, proxies):
             proxies=proxies_dict,
             timeout=None
         )
-        
+
         if login_response.status_code == 200:
             response_data = login_response.json()
             if not response_data or 'data' not in response_data or 'token' not in response_data['data']:
@@ -190,7 +191,7 @@ def create_account(referral_code, account_number, total_accounts, proxies):
 
             token = response_data['data']['token']
             print(format_console_output(timestamp, account_number, total_accounts, "SUCCESS", address, referral_code, Fore.GREEN))
-            
+
             perform_tasks(token, proxies_dict)
             save_account(private_key, address, referral_code)
             print(f"{Fore.CYAN}Processing next account...{Style.RESET_ALL}")
@@ -218,17 +219,17 @@ def main():
     referral_code = input(f"{Fore.YELLOW}Enter referral code: {Style.RESET_ALL}")
     num_accounts = int(input(f"{Fore.YELLOW}Enter how many referral: {Style.RESET_ALL}"))
     print()
-    
+
     proxies = load_proxies()
     if not proxies:
         print(f"{Fore.YELLOW}No proxies found in proxies.txt, running without proxies")
-    
+
     successful = 0
     for i in range(1, num_accounts + 1):
         if create_account(referral_code, i, num_accounts, proxies):
             successful += 1
-    
-    print(f"\n{Fore.CYAN}[✓] All Process Completed!{Style.RESET_ALL}")
+
+    print(f"\n{Fore.CYAN}[\u2713] All Process Completed!{Style.RESET_ALL}")
     print(f"{Fore.WHITE}Total: {Fore.YELLOW}{num_accounts} {Fore.WHITE}| "
           f"Success: {Fore.GREEN}{successful} {Fore.WHITE}| "
           f"Failed: {Fore.RED}{num_accounts - successful}")
